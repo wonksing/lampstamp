@@ -40,20 +40,21 @@ func main() {
 	texts := []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"}
 	for i := 0; i < len(texts); i++ {
 		go c.SendToServer1("msg-id-1", "hello "+texts[i])
-		// go c2.SendToServer2("msg-id-1", "hello "+texts[i])
+		go c2.SendToServer2("msg-id-1", "hello "+texts[i])
 		// go c.SendToServer2("msg-id-1", "hello "+texts[i])
 	}
-	time.Sleep(15 * time.Second)
+	time.Sleep(5 * time.Second)
 
-	fmt.Println(c.ts.Get("msg-id-1"), c2.ts.Get("msg-id-1"), storage.m["msg-id-1"].Version)
+	fmt.Printf("%d, %d, %s(%d)\n", c.ts.Get("msg-id-1"), c2.ts.Get("msg-id-1"), storage.m["msg-id-1"].Text, storage.m["msg-id-1"].Version)
 }
 
 type Message struct {
-	ID       string
-	ClientID string
-	Text     string
-	Version  int64
-	Failed   bool
+	ID             string
+	ClientID       string
+	Text           string
+	Version        int64
+	Failed         bool
+	StorageVersion int64
 }
 
 type Client struct {
@@ -82,7 +83,7 @@ func (c *Client) Send(id, text string) {
 	for i := 0; i < len(texts); i++ {
 
 		go func(i int) {
-			msg := Message{id, c.ID, text + texts[i], version, false}
+			msg := Message{id, c.ID, text + texts[i], version, false, 0}
 			fmt.Printf("%s send %s(%s), version %d, %v\n", msg.ClientID, msg.ID, msg.Text, msg.Version, time.Now())
 			c.serverChannel1 <- msg
 
@@ -107,7 +108,7 @@ func (c *Client) SendToServer2(id, text string) {
 
 func (c *Client) send(server chan Message, id, text string) {
 	version := c.ts.Inc(id)
-	msg := Message{id, c.ID, text, version, false}
+	msg := Message{id, c.ID, text, version, false, 0}
 	fmt.Printf("%s send %s(%s), version %d, %v\n", msg.ClientID, msg.ID, msg.Text, msg.Version, time.Now())
 	server <- msg
 
@@ -117,7 +118,7 @@ func (c *Client) send(server chan Message, id, text string) {
 		return
 	}
 	version = c.ts.Tick(id, recvedMessage.Version)
-	fmt.Printf("%s recv %s(%s), version %d\n", recvedMessage.ClientID, recvedMessage.ID, recvedMessage.Text, version)
+	fmt.Printf("\t\t%s recv %s(%s), version %d(%d)\n", recvedMessage.ClientID, recvedMessage.ID, recvedMessage.Text, version, recvedMessage.StorageVersion)
 }
 
 type Server struct {
@@ -144,29 +145,30 @@ func (s *Server) Receive() {
 	if version = s.ts.Get(msg.ID); msg.Version < version {
 		log.Printf("\t%s fail %s(%s), msg.Version < version %d < %d\n", s.ID, msg.ID, msg.Text, msg.Version, version)
 		clientChannel, _ := s.clientChannels.Load(msg.ClientID)
-		clientChannel.(chan Message) <- Message{msg.ID, msg.ClientID, msg.Text, msg.Version, true}
+		clientChannel.(chan Message) <- Message{msg.ID, msg.ClientID, msg.Text, msg.Version, true, 0}
 		return
 	}
 
 	version = s.ts.Tick(msg.ID, msg.Version)
 	s.storage.Begin()
+	defer s.storage.End()
 
 	// storage check is needed when server restart(resetting timestamp)
+	// and when multiple servers are running
 	storageMsgVersion := s.storage.ReadVersion(msg.ID)
 	if storageMsgVersion >= version {
 		log.Printf("\t%s fail %s(%s), storageMsgVersion >= version %d >= %d\n", s.ID, msg.ID, msg.Text, storageMsgVersion, version)
 		clientChannel, _ := s.clientChannels.Load(msg.ClientID)
-		clientChannel.(chan Message) <- Message{msg.ID, msg.ClientID, msg.Text, msg.Version, true}
+		clientChannel.(chan Message) <- Message{msg.ID, msg.ClientID, msg.Text, msg.Version, true, 0}
 		return
 	}
 
 	msg.Version = version
 	s.storage.Store(msg)
-	s.storage.End()
 
 	fmt.Printf("\t%s respond %s(%s), version %d\n", s.ID, msg.ID, msg.Text, msg.Version)
 	clientChannel, _ := s.clientChannels.Load(msg.ClientID)
-	clientChannel.(chan Message) <- Message{msg.ID, msg.ClientID, msg.Text, msg.Version, false}
+	clientChannel.(chan Message) <- Message{msg.ID, msg.ClientID, msg.Text, msg.Version, false, msg.Version}
 }
 
 type Storage struct {
