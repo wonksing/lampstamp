@@ -1,7 +1,7 @@
 package main
 
 import (
-	"encoding/json"
+	"fmt"
 	"log"
 	"math/rand"
 	"sync"
@@ -41,9 +41,9 @@ func main() {
 	c := NewClient("client-1", clientChannel1, serverChannel1, serverChannel2)
 	c2 := NewClient("client-2", clientChannel2, serverChannel1, serverChannel2)
 
-	go c.SendToServer1("msg-id-1", c.ID+" hello")
+	go c.SendToServer1("msg-id-1", "foo")
 	time.Sleep(100 * time.Millisecond)
-	go c2.SendToServer2("msg-id-1", c2.ID+" hello")
+	go c2.SendToServer2("msg-id-1", "bar")
 
 	time.Sleep(5 * time.Second)
 
@@ -60,8 +60,7 @@ type Message struct {
 }
 
 func (m *Message) String() string {
-	b, _ := json.Marshal(m)
-	return string(b)
+	return fmt.Sprintf("%s(version: %d)", m.Text, m.Version)
 }
 
 type Client struct {
@@ -101,13 +100,13 @@ func (c *Client) send(server chan Message, id, text string) {
 		Text:     text,
 		Version:  version,
 	}
-	log.Printf("%s(version: %d) sends '%s'\n", c.ID, version, msg.String())
+	log.Printf("%s sends '%s'\n", c.ID, msg.String())
 	server <- msg
 
 	resMsg := <-c.clientChannel
 
 	version = c.Timestamp.Tick(id, resMsg.Version)
-	log.Printf("\t\t%s(version: %d) received '%s'\n", c.ID, version, resMsg.String())
+	log.Printf("\t\t%s received '%s'\n", c.ID, resMsg.String())
 }
 
 type Server struct {
@@ -146,7 +145,7 @@ func (s *Server) Receive() {
 
 	s.storage.Store(msg)
 
-	log.Printf("\t%s(version: %d) responds '%s'\n", s.ID, version, msg.String())
+	log.Printf("\t%s responds '%s'\n", s.ID, msg.String())
 	clientChannel, _ := s.clientChannels.Load(msg.ClientID)
 	clientChannel.(chan Message) <- Message{msg.ID, msg.ClientID, msg.Text, msg.Version}
 }

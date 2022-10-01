@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"log"
 	"math/rand"
 	"sync"
@@ -41,14 +40,14 @@ func main() {
 	c := NewClient("client-1", clientChannel1, serverChannel1, serverChannel2)
 	c2 := NewClient("client-2", clientChannel2, serverChannel1, serverChannel2)
 
-	go c.SendToServer1("msg-id-1", c.ID+" hello")
+	go c.SendToServer1("msg-id-1", "foo")
 	time.Sleep(100 * time.Millisecond)
-	go c2.SendToServer2("msg-id-1", c2.ID+" hello")
+	go c2.SendToServer2("msg-id-1", "bar")
 
 	time.Sleep(5 * time.Second)
 
 	mm := storage.Read("msg-id-1")
-	log.Printf("message in storage: %s\n", mm.String())
+	log.Printf("Message in storage: %s\n", mm.String())
 }
 
 type Message struct {
@@ -61,8 +60,7 @@ type Message struct {
 }
 
 func (m *Message) String() string {
-	b, _ := json.Marshal(m)
-	return string(b)
+	return m.Text
 }
 
 type Client struct {
@@ -103,16 +101,16 @@ func (c *Client) send(server chan Message, id, text string) {
 		Version:  version,
 		Failed:   false,
 	}
-	log.Printf("%s(version: %d) sends '%s'\n", c.ID, version, msg.String())
+	log.Printf("%s sends '%s'\n", c.ID, msg.String())
 	server <- msg
 
 	resMsg := <-c.clientChannel
 	if resMsg.Failed {
-		log.Printf("\t\tERROR: %s(version: %d) received '%s'\n", c.ID, version, resMsg.String())
+		log.Printf("\t\tERROR: %s received '%s'\n", c.ID, resMsg.String())
 		return
 	}
 	version = c.Timestamp.Tick(id, resMsg.Version)
-	log.Printf("\t\t%s(version: %d) received '%s'\n", c.ID, version, resMsg.String())
+	log.Printf("\t\t%s received '%s'\n", c.ID, resMsg.String())
 }
 
 type Server struct {
@@ -146,7 +144,7 @@ func (s *Server) Receive() {
 	var version int64
 	if version = s.Timestamp.Get(msg.ID); msg.Version < version {
 		msg.Failed = true
-		log.Printf("\tERROR %s(version: %d) server version is higher than msg version, '%s'\n", s.ID, version, msg.String())
+		log.Printf("\tERROR %s server version is higher than msg version, '%s'\n", s.ID, msg.String())
 		// log.Printf("\t%s fail %s(%s), msg.Version < version %d < %d\n", s.ID, msg.ID, msg.Text, msg.Version, version)
 		clientChannel, _ := s.clientChannels.Load(msg.ClientID)
 		clientChannel.(chan Message) <- msg
@@ -164,8 +162,7 @@ func (s *Server) Receive() {
 	storageMsgVersion := s.storage.ReadVersion(msg.ID)
 	if storageMsgVersion >= msg.Version {
 		msg.Failed = true
-		log.Printf("\tERROR %s(version: %d): msg version is not higher than storage's, '%s'\n", s.ID, version, msg.String())
-		// log.Printf("\t%s fail %s(%s), storageMsgVersion >= version %d >= %d\n", s.ID, msg.ID, msg.Text, storageMsgVersion, version)
+		log.Printf("\tERROR %s: msg version is not higher than storage's, '%s'\n", s.ID, msg.String())
 		clientChannel, _ := s.clientChannels.Load(msg.ClientID)
 		clientChannel.(chan Message) <- msg
 		return
@@ -173,8 +170,7 @@ func (s *Server) Receive() {
 
 	s.storage.Store(msg)
 
-	log.Printf("\t%s(version: %d) responds '%s'\n", s.ID, version, msg.String())
-	// log.Printf("\t%s respond %s(%s)\n", s.ID, msg.ID, msg.Text)
+	log.Printf("\t%s responds '%s'\n", s.ID, msg.String())
 	clientChannel, _ := s.clientChannels.Load(msg.ClientID)
 	clientChannel.(chan Message) <- Message{msg.ID, msg.ClientID, msg.Text, msg.Version, false}
 }

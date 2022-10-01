@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"log"
 	"math/rand"
 	"sync"
@@ -38,17 +37,17 @@ func main() {
 		}
 	}()
 
-	c := NewClient("client-1", clientChannel1, serverChannel1, serverChannel2)
-	c2 := NewClient("client-2", clientChannel2, serverChannel1, serverChannel2)
+	client1 := NewClient("client-1", clientChannel1, serverChannel1, serverChannel2)
+	client2 := NewClient("client-2", clientChannel2, serverChannel1, serverChannel2)
 
-	go c.SendToServer1("msg-id-1", c.ID+" hello")
+	go client1.SendToServer1("msg-id-1", "foo")
 	time.Sleep(100 * time.Millisecond)
-	go c2.SendToServer2("msg-id-1", c2.ID+" hello")
+	go client2.SendToServer2("msg-id-1", "bar")
 
 	time.Sleep(5 * time.Second)
 
 	mm := storage.Read("msg-id-1")
-	log.Printf("message in storage: %s\n", mm.String())
+	log.Printf("Message in storage: %s\n", mm.String())
 }
 
 type Message struct {
@@ -58,8 +57,7 @@ type Message struct {
 }
 
 func (m *Message) String() string {
-	b, _ := json.Marshal(m)
-	return string(b)
+	return m.Text
 }
 
 type Client struct {
