@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"sync"
 	"time"
+
+	"github.com/wonksing/lampstamp"
 )
 
 func init() {
@@ -71,7 +73,7 @@ type Client struct {
 
 	clientChannel chan Message
 
-	Timestamp *LamportTimestamp
+	Timestamp *lampstamp.Lampstamp
 }
 
 func NewClient(id string, clientChannel, serverChannel1, serverChannel2 chan Message) *Client {
@@ -80,7 +82,7 @@ func NewClient(id string, clientChannel, serverChannel1, serverChannel2 chan Mes
 		serverChannel1: serverChannel1,
 		serverChannel2: serverChannel2,
 		clientChannel:  clientChannel,
-		Timestamp:      NewTimestamp(),
+		Timestamp:      lampstamp.NewLampstamp(),
 	}
 }
 
@@ -121,7 +123,7 @@ type Server struct {
 
 	delay time.Duration
 
-	Timestamp *LamportTimestamp
+	Timestamp *lampstamp.Lampstamp
 }
 
 func NewServer(id string, storage *Storage, serverChannel chan Message, clientChannels *sync.Map, delay time.Duration) *Server {
@@ -132,7 +134,7 @@ func NewServer(id string, storage *Storage, serverChannel chan Message, clientCh
 		clientChannels: clientChannels,
 		delay:          delay,
 
-		Timestamp: NewTimestamp(),
+		Timestamp: lampstamp.NewLampstamp(),
 	}
 }
 func (s *Server) Receive() {
