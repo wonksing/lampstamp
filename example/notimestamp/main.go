@@ -1,7 +1,8 @@
 package main
 
 import (
-	"fmt"
+	"encoding/json"
+	"log"
 	"math/rand"
 	"sync"
 	"time"
@@ -16,29 +17,29 @@ func main() {
 	clientChannel1 := make(chan Message)
 	clientChannel2 := make(chan Message)
 	var clientChannels sync.Map
-	clientChannels.Store("wonk", clientChannel1)
-	clientChannels.Store("bobi", clientChannel2)
+	clientChannels.Store("client-1", clientChannel1)
+	clientChannels.Store("client-2", clientChannel2)
 
 	serverChannel1 := make(chan Message)
 	serverChannel2 := make(chan Message)
 
 	storage := NewStorage()
 
-	s1 := NewServer("server-one", storage, serverChannel1, &clientChannels, 200*time.Millisecond)
+	s1 := NewServer("svr-1", storage, serverChannel1, &clientChannels, 200*time.Millisecond)
 	go func() {
 		for {
 			s1.Receive()
 		}
 	}()
-	s2 := NewServer("server-two", storage, serverChannel2, &clientChannels, 0+time.Millisecond)
+	s2 := NewServer("svr-2", storage, serverChannel2, &clientChannels, 0+time.Millisecond)
 	go func() {
 		for {
 			s2.Receive()
 		}
 	}()
 
-	c := NewClient("wonk", clientChannel1, serverChannel1, serverChannel2)
-	c2 := NewClient("bobi", clientChannel2, serverChannel1, serverChannel2)
+	c := NewClient("client-1", clientChannel1, serverChannel1, serverChannel2)
+	c2 := NewClient("client-2", clientChannel2, serverChannel1, serverChannel2)
 
 	go c.SendToServer1("msg-id-1", c.ID+" hello")
 	time.Sleep(100 * time.Millisecond)
@@ -46,13 +47,19 @@ func main() {
 
 	time.Sleep(5 * time.Second)
 
-	fmt.Printf("%s, %s, %s\n", storage.m["msg-id-1"].ID, storage.m["msg-id-1"].ClientID, storage.m["msg-id-1"].Text)
+	mm := storage.Read("msg-id-1")
+	log.Printf("message in storage: %s\n", mm.String())
 }
 
 type Message struct {
 	ID       string
 	ClientID string
 	Text     string
+}
+
+func (m *Message) String() string {
+	b, _ := json.Marshal(m)
+	return string(b)
 }
 
 type Client struct {
@@ -87,11 +94,12 @@ func (c *Client) send(server chan Message, id, text string) {
 		ClientID: c.ID,
 		Text:     text,
 	}
-	fmt.Printf("%s send %s(%s), %v\n", msg.ClientID, msg.ID, msg.Text, time.Now())
+	log.Printf("%s sends '%s'\n", c.ID, msg.String())
 	server <- msg
 
-	recvedMessage := <-c.clientChannel
-	fmt.Printf("\t\t%s recv %s(%s)\n", recvedMessage.ClientID, recvedMessage.ID, recvedMessage.Text)
+	resMsg := <-c.clientChannel
+
+	log.Printf("\t\t%s received '%s'\n", c.ID, resMsg.String())
 }
 
 type Server struct {
@@ -119,9 +127,10 @@ func (s *Server) Receive() {
 
 	s.storage.Begin()
 	defer s.storage.End()
+
 	s.storage.Store(msg)
 
-	fmt.Printf("\t%s respond %s(%s)\n", s.ID, msg.ID, msg.Text)
+	log.Printf("\t%s responds '%s'\n", s.ID, msg.String())
 	clientChannel, _ := s.clientChannels.Load(msg.ClientID)
 	clientChannel.(chan Message) <- Message{msg.ID, msg.ClientID, msg.Text}
 }
@@ -147,4 +156,11 @@ func (s *Storage) End() {
 
 func (s *Storage) Store(msg Message) {
 	s.m[msg.ID] = msg
+}
+
+func (s *Storage) Read(id string) Message {
+	if m, ok := s.m[id]; ok {
+		return m
+	}
+	return Message{}
 }
