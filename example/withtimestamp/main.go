@@ -175,7 +175,7 @@ func (s *Storage) ReadVersion(msgID string) int64 {
 	if val, ok := s.m[msgID]; ok {
 		return val.Version
 	}
-	return defaultTimestamp
+	return 0
 }
 
 func (s *Storage) Store(msg Message) {

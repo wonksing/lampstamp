@@ -46,7 +46,7 @@ func (ts *Lampstamp) Inc(key string) int64 {
 	ts.m[key] = val
 
 	if !ok {
-		if popped, err := ts.b.PopIfFullThenPush(key); err == nil && popped != key {
+		if popped, err := ts.b.PopIfFullThenPush(key); err == nil {
 			delete(ts.m, popped)
 		}
 	}
@@ -69,7 +69,7 @@ func (ts *Lampstamp) Tick(key string, requestTimestamp int64) int64 {
 	ts.m[key] = val
 
 	if !ok {
-		if popped, err := ts.b.PopIfFullThenPush(key); err == nil && popped != key {
+		if popped, err := ts.b.PopIfFullThenPush(key); err == nil {
 			delete(ts.m, popped)
 		}
 	}
