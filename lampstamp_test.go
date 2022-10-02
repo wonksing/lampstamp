@@ -9,7 +9,7 @@ import (
 )
 
 func TestLampstamp(t *testing.T) {
-	lt := NewLampstampSize(5)
+	lt := NewMapStampSize(5)
 	for i := 0; i < 10; i++ {
 		key := strconv.Itoa(i)
 		lt.Tick(key, 1)
@@ -32,7 +32,7 @@ func TestLampstamp(t *testing.T) {
 }
 
 func BenchmarkLampstamp(b *testing.B) {
-	lt := NewLampstampSize(102400)
+	lt := NewMapStampSize(102400)
 	benchmarks := []string{"1", "2"}
 	for _, bm := range benchmarks {
 		b.Run(bm, func(b *testing.B) {
@@ -45,7 +45,7 @@ func BenchmarkLampstamp(b *testing.B) {
 }
 
 func BenchmarkLampstampParallel(b *testing.B) {
-	lt := NewLampstampSize(102400)
+	lt := NewMapStampSize(102400)
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			id := uuid.New().String()

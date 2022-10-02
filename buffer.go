@@ -5,6 +5,7 @@ import (
 	"fmt"
 )
 
+// StampBuffer acts like ring buffer.
 type StampBuffer struct {
 	b []string
 	r int64

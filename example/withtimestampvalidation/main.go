@@ -73,7 +73,7 @@ type Client struct {
 
 	clientChannel chan Message
 
-	Timestamp *lampstamp.Lampstamp
+	Timestamp *lampstamp.MapStamp
 }
 
 func NewClient(id string, clientChannel, serverChannel1, serverChannel2 chan Message) *Client {
@@ -82,7 +82,7 @@ func NewClient(id string, clientChannel, serverChannel1, serverChannel2 chan Mes
 		serverChannel1: serverChannel1,
 		serverChannel2: serverChannel2,
 		clientChannel:  clientChannel,
-		Timestamp:      lampstamp.NewLampstamp(),
+		Timestamp:      lampstamp.NewMapStamp(),
 	}
 }
 
@@ -123,7 +123,7 @@ type Server struct {
 
 	delay time.Duration
 
-	Timestamp *lampstamp.Lampstamp
+	Timestamp *lampstamp.MapStamp
 }
 
 func NewServer(id string, storage *Storage, serverChannel chan Message, clientChannels *sync.Map, delay time.Duration) *Server {
@@ -134,7 +134,7 @@ func NewServer(id string, storage *Storage, serverChannel chan Message, clientCh
 		clientChannels: clientChannels,
 		delay:          delay,
 
-		Timestamp: lampstamp.NewLampstamp(),
+		Timestamp: lampstamp.NewMapStamp(),
 	}
 }
 func (s *Server) Receive() {

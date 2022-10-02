@@ -2,18 +2,27 @@ package lampstamp
 
 import "sync"
 
-type Lampstamp struct {
+// MapStamp stores timestamp in a sized map. The maximum size of the map, m, should be determined
+// upon creation.
+type MapStamp struct {
+	// m is a map that stores timestamps by given key
 	m map[string]int64
+	// mutex to lock when read/write to m
 	l sync.RWMutex
+	// holds the push history of m so that it can delete old keys from m.
 	b *StampBuffer
 }
 
-func NewLampstamp() *Lampstamp {
-	return NewLampstampSize(1024)
+const defaultSize = 4096
+
+// NewMapStamp creates default MapStamp
+func NewMapStamp() *MapStamp {
+	return NewMapStampSize(defaultSize)
 }
 
-func NewLampstampSize(size int64) *Lampstamp {
-	return &Lampstamp{
+// NewMapStampSize creates MapStamp with size.
+func NewMapStampSize(size int64) *MapStamp {
+	return &MapStamp{
 		m: make(map[string]int64),
 		b: NewStampBuffer(size),
 	}
@@ -21,7 +30,8 @@ func NewLampstampSize(size int64) *Lampstamp {
 
 const defaultTimestamp = 0
 
-func (ts *Lampstamp) Get(key string) int64 {
+// Get retreives a timestamp of key.
+func (ts *MapStamp) Get(key string) int64 {
 	ts.l.RLock()
 	defer ts.l.RUnlock()
 
@@ -32,7 +42,10 @@ func (ts *Lampstamp) Get(key string) int64 {
 	return defaultTimestamp
 }
 
-func (ts *Lampstamp) Inc(key string) int64 {
+// Inc increments a timestamp of key if exists. Otherwise it increments defaultTimestamp
+// then stores it. It returns the incremented value.
+// It deletes oldest key from underlying m if the size of m is reached to the capacity of underlying b.
+func (ts *MapStamp) Inc(key string) int64 {
 	ts.l.Lock()
 	defer ts.l.Unlock()
 
@@ -54,7 +67,12 @@ func (ts *Lampstamp) Inc(key string) int64 {
 	return val
 }
 
-func (ts *Lampstamp) Tick(key string, requestTimestamp int64) int64 {
+// Tick compares a timestamp of key with requestTimestamp to find maximum timestamp.
+// Then it increments the maximum value by 1.
+// Then it stores the new timestamp to underlying m.
+// Then it deletes oldest key from underlying m if the size of m is full(capacity of underlying b).
+// Then it returns the new timestamp.
+func (ts *MapStamp) Tick(key string, requestTimestamp int64) int64 {
 	ts.l.Lock()
 	defer ts.l.Unlock()
 
